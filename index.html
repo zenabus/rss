@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>NFT Resource Unpacker</title>
+  <meta charset="utf-8">
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+  <script type="text/javascript" src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
+</head>
+<body>
+  <div class="container mt-2">
+    <a href="" class="btn btn-primary mb-2">Refresh</a>
+    <div class="row mb-2">
+      <div class="col-md-12">
+        <label>Token</label>
+        <textarea class="form-control" id="token" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="row mb-4">
+      <div class="col-md-2">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-block" id="save">Save Token</button>
+      </div>
+      <div class="col-md-2">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-block" id="fetch" disabled>Fetch Resources</button>
+      </div>
+      <div class="col-md-2">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-block" id="connect" disabled>Connect Wallet</button>
+      </div>
+      <div class="col-md-3">
+        <label>Status</label>
+        <input type="text" id="status" class="form-control" readonly>
+      </div>
+    </div>
+
+    <div class="row mb-5">
+      <div class="col-12">
+        <table class="table table-bordered table-hover mb-2" id="table">
+          <thead>
+            <tr>
+              <th>Mint Address</th>
+              <th>Token ID</th>
+              <th>Resource</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+          <!-- javascript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+	<script type="text/javascript">
+    const method = 'post';
+    const url = {
+      items: 'https://api-lok-live.leagueofkingdoms.com/api/nft/item/list',
+      use: 'https://api-lok-live.leagueofkingdoms.com/api/nft/item/use',
+    }
+    const rss = {
+      10101019: '🌽 Food 1M',
+      10101020: '🌽 Food 5M',
+      10101021: '🌽 Food 10M',
+      10101028: '🪵 Lumber 1M',
+      10101029: '🪵 Lumber 5M',
+      10101030: '🪵 Lumber 10M',
+      10101037: '🪨 Stone 1M',
+      10101038: '🪨 Stone 5M',
+      10101039: '🪨 Stone 10M',
+      10101046: '🪙 Gold 1M',
+      10101047: '🪙 Gold 5M',
+      10101048: '🪙 Gold 10M',
+    }
+    const status = {
+      4: 'Tokenization',
+      3: 3,
+      2: 2,
+      1: 1,
+      0: 'Packing',
+    }
+    let accounts = [];
+    let token;
+
+    $(document).ready(function() {
+      $('#table').DataTable({
+        aLengthMenu: [
+          [25, 50, 100, 200, -1],
+          [25, 50, 100, 200, "All"]
+        ],
+        "order": [[ 2, "asc" ]],
+        "iDisplayLength": -1
+      });
+    });
+
+    $('#save').click(function(){
+      token = $('#token').val();
+      $('#status').val('Token saved');
+      $('#fetch').attr('disabled', false);
+      $('#connect').attr('disabled', false);
+      $('#save').attr('disabled', true);
+      $('#token').attr('disabled', true);
+      $('#fetch').click();
+    });
+
+    $('#fetch').click(function(){
+      $('#status').val('Fetching data');
+      $('#fetch').attr('disabled', true);
+      getResources();
+    });
+
+    function getResources() {
+      const table = $('#table').DataTable();
+      const body = `json=%7B%22tokenType%22%3A0%2C%22reload%22%3Atrue%7D`;
+      const headers = {
+        'x-access-token': token,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+
+      table.clear().draw();
+      
+      fetch(url.items, {method, headers, body})
+        .then(res => res.json())
+        .then(res => {
+          if(res.result) {
+            $('#status').val('Data fetched');
+            $('#fetch').attr('disabled', false);
+            console.log(res);
+
+            res.items.map(item => {
+              if(item.status==4) {
+                const use = `<button class="use btn btn-sm btn-primary" id="${item.tokenId}">Use</button>`;
+                table.row.add([item.minterAddress, `#${item.tokenId}`, rss[item.itemCode], status[item.status], use]).draw(false);
+              }
+            });
+          } else {
+            $('#status').val(res.err.code);
+          }
+        });
+    }
+
+    $(document).on('click', '.use', function(){
+      $(this).attr('disabled', true);
+      $('#status').val('Opening Metamask');
+      const token_id = this.id;
+      const body = `json=%7B%22wallet%22%3A%22metamask%22%2C%22tokenId%22%3A%22${token_id}%22%2C%22tokenType%22%3A0%7D`;
+      const headers = {
+        'x-access-token': token,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+
+      fetch(url.use, {method, headers, body})
+        .then(res => res.json())
+        .then(res => {
+          if(res.result) {
+            $('#status').val('Waiting for confirmation');
+            const txData = JSON.parse(res.txData);
+            const txCode = res.txCode
+            ethereum
+              .request({
+                method: 'eth_sendTransaction',
+                params: [{
+                  from: accounts[0],
+                  to: txData.to,
+                  value: '0',
+                  data: txData.data
+                }]
+              })
+              .then((txHash) => {
+                console.log(txHash)
+              })
+              .catch((error) => console.error);
+          } else {
+            $('#status').val(res.err.code);
+          }
+        });
+    });
+
+    async function getAccount() {
+      accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      $('#status').val('Wallet connected');
+      $('#connect').attr('disabled', true);
+    }
+
+    $('#connect').click(function(){
+      getAccount();
+    });
+
+    setInterval(function(){
+      if(accounts.length) {
+        $('#connect').attr('disabled', true);
+      } else {
+        $('#connect').attr('disabled', false);
+      }
+    }, 1000);
+	</script>
+</body>
+</html>
